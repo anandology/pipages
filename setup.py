@@ -16,6 +16,6 @@ setup(
             "pipages=pipages.pipages:main"
         ]
     },
-    install_requires=[]
+    install_requires=['PyYAML']
 )
 
