@@ -11,7 +11,7 @@ import web
 from . import pipages
 
 urls = (
-    "/.*", "build"
+    "/?.*", "build"
 )
 app = web.application(urls, globals())
 
@@ -23,7 +23,8 @@ def get_website(name):
 class build:
     def POST(self):
         i = web.input(name="", _method="GET")
-        d = get_website(i.name)
+        name = i.name
+        d = get_website(name)
         if not d:
             raise web.notfound()
 

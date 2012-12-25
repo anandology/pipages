@@ -5,13 +5,14 @@ import os
 import logging
 import atexit
 import shutil
+import commands
 
 logger = logging.getLogger("pipages")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] [%(levelname)s] %(message)s")
 
-commands = {
+build_commands = {
     "jekyll": "jekyll --safe %(src)s %(dest)s",
-    "mynt": "mynt gen %(src)s %(dest)s",
+    "mynt": "mynt gen -f %(src)s %(dest)s",
     "pelican": "pelican %(src)s -o %(dest)s",
 }
 
@@ -20,26 +21,23 @@ clone_commands = {
     "hg": "hg clone %(src)s %(dest)s"
 }
 
+def system(cmd):
+    logger.info(cmd)
+    status, output = commands.getstatusoutput(cmd)
+    if status == 0:
+        logger.info(output)
+    else:
+        logger.error(output)
+        logger.error("command failed with status %d", status)
+        sys.exit(status)
+
 def clone_repo(type, source_url, dest_dir):
     cmd = clone_commands[type] % dict(src=source_url, dest=dest_dir)
-
-    logger.info(cmd)
-    status = os.system(cmd)
-    if status == 0:
-        print "fetched the repo successfully to", dest_dir
-    else:
-        print >> sys.stderr, "failed to fetch the repository"
-        sys.exit(1)
+    status = system(cmd)
 
 def generate(engine, source, dest):
-    cmd = commands[engine] % dict(src=source, dest=dest)
-    logger.info(cmd)
-    status = os.system(cmd)
-    if status == 0:
-        print "build successful", dest    
-    else:
-        print >> sys.stderr, "build failed"
-        sys.exit(2)
+    cmd = build_commands[engine] % dict(src=source, dest=dest)
+    system(cmd)
 
 def parse_options():
     p = optparse.OptionParser(usage="%prog -e [jekyll|mynt|pelican] source-dir dest-dir")
