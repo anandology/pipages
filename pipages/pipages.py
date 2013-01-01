@@ -1,28 +1,53 @@
 import sys
-import optparse
-import tempfile
+import argparse
 import os
 import logging
-import atexit
-import shutil
 import commands
+import string
 
-logger = logging.getLogger("pipages")
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] [%(levelname)s] %(message)s")
+from . import _config
+from .path import File
 
-build_commands = {
-    "jekyll": "jekyll --safe %(src)s %(dest)s",
-    "mynt": "mynt gen -f %(src)s %(dest)s",
-    "pelican": "pelican %(src)s -o %(dest)s",
-}
+__VERSION__ = "0.1"
 
-clone_commands = {
-    "git": "git clone %(src)s %(dest)s",
-    "hg": "hg clone %(src)s %(dest)s"
-}
+class Repository:
+    """Interface to work with repository.
 
-def system(cmd):
-    logger.info(cmd)
+    Supports cloning a repository or updating an existing copy.
+
+    NOTE: Only git is suppoted as of now.
+    """
+    def __init__(self, repo_url, type="git", config=None):
+        if config is None:
+            config = _config.default_config['repos']
+        self.cmd_clone = config[type]['clone']
+        self.cmd_update = config[type]['update']
+        self.repo_url = repo_url
+
+    def sync(self, working_dir):
+        """Synchronizes the repository to the specified working copy.
+
+        If the specified directory is already present, it'll be updated. If 
+        not, a fresh copy will be checked out.
+        """
+        d = working_dir
+        if d.exists():
+            self.update(d)
+        else:
+            self.clone(d)
+
+    def clone(self, dir):
+        with dir.parent().chdir():
+            system(self.cmd_clone, repo_url=self.repo_url, src=dir.path)
+
+    def update(self, dir):
+        with dir.chdir():
+            system(self.cmd_update, repo_url=self.repo_url, src=dir.path)
+
+def system(cmd, **params):
+    cmd = string.Template(cmd).safe_substitute(**params)
+    logger.info("system %r", cmd)
+
     status, output = commands.getstatusoutput(cmd)
     if status == 0:
         logger.info(output)
@@ -31,46 +56,106 @@ def system(cmd):
         logger.error("command failed with status %d", status)
         sys.exit(status)
 
-def clone_repo(type, source_url, dest_dir):
-    cmd = clone_commands[type] % dict(src=source_url, dest=dest_dir)
-    status = system(cmd)
+logger = logging.getLogger("pipages")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] [%(levelname)s] %(message)s")
 
-def generate(engine, source, dest):
-    cmd = build_commands[engine] % dict(src=source, dest=dest)
-    system(cmd)
+def parse_args(args=None):
+    description = "pipages is a tool for building static websites."
+    epilog = "For additional information, see http://pipages.anandology.com/"
 
-def parse_options():
-    p = optparse.OptionParser(usage="%prog -e [jekyll|mynt|pelican] source-dir dest-dir")
-    p.add_option("-e", "--engine", choices=["jekyll", "mynt", "pelican"], help="Website generation engine to use")
-    p.add_option("--repo", choices=["git", "hg"], help="Repository type when the source is a repository")
-    p.add_option("--tmpdir", help="tmp directory to store temporary folders.")
-    options, args = p.parse_args()
-    if options.engine is None:
-        p.error("Please provide an engine")
-    if len(args) != 2:
-        p.error("please provide souce-dir and dest-dir arguments")
-    return options, args
+    p = argparse.ArgumentParser(description=description, epilog=epilog)
 
-def remote_dir(dir):
-    logger.info("deleting temporary directory %s", dir)
-    shutil.rmtree(dir, ignore_errors=True)
+    p.add_argument("project", help="name of the project to build")
 
-def mkdtemp(root, suffix=""):
-    dir = tempfile.mkdtemp(prefix="pipages-", suffix=suffix, dir=root)
-    atexit.register(remote_dir, dir)
-    return dir
+    p.add_argument("-c", "--config", help="path to pipages config file")
+    p.add_argument("-e", "--engine", help="Website generation engine to use")
+    p.add_argument("--repo", help="Repository URL to fetch the sources")
+    p.add_argument("--root", help="Root directory to keep sources and builds. (default: current directory)", default=None)
+    p.add_argument("--build-root", help="Directory to keep the builds. (default: $root/build)")
+    p.add_argument("--src-root", help="Directory to keep the sources. (default: $root/src)")
+    return p.parse_args(args)
 
-def build(engine, src, dest, repo=None, tmpdir=None):
-    if repo:
-        tmp = mkdtemp(tmpdir)
-        clone_repo(repo, src, tmp)
-        src = tmp
+def update_config(config, args):
+    if args.root:
+        config['root'] = args.root
 
-    generate(engine, src, dest)
+    if args.build_root:
+        config['build_root'] = args.build_root
+    if 'build_root' not in config:
+        config['build_root'] = os.path.join(config['root'], 'build')
+
+    if args.src_root:
+        config['src_root'] = args.src_root
+    if 'src_root' not in config:
+        config['src_root'] = os.path.join(config['root'], 'src')
+
+def get_project_vars(config, args):
+    """Combines config and args and return the vars relevant for the project
+    specified in the args.
+    """
+    root = config.get("root", "")
+    if args.root:
+        root = args.root
+    root = File(root).abspath()
+
+    build_root = File(args.build_root or 
+                      config.get("build_root") or
+                      root.join("build").path).abspath()
+    src_root = File(args.src_root or 
+                    config.get("src_root") or 
+                    root.join("src").path).abspath()
+
+    name = args.project
+    d = config.get("projects", {}).get(name, {})
+    d.setdefault("name", name)
+
+    # using d['name'] because config can specify a different name
+    d['src'] = src_root.join(d['name'])
+    d['dest'] = build_root.join(d['name'])
+
+    if args.repo: # or use the default from config
+        d['repo'] = args.repo
+
+    if args.engine: # or use the default from config
+        d['engine'] = args.engine
+
+    if 'engine' not in d:
+        raise Exception("engine not specified")
+
+    if 'repo' not in d:
+        raise Exception("repository url not specified")
+
+    engines = config.get("engines")
+    if d['engine'] not in engines:
+        raise Exception("Unknown engine: %r" % d['engine'])
+    d['build_command'] = engines[d['engine']]
+    return d
+
+def build(args):
+    if args.config:
+        config = _config.load_config(args.config)
+    else:
+        config = _config.autoload_config()
+
+    d = get_project_vars(config, args)
+
+    d['src'].parent().makedirs()
+    d['dest'].parent().makedirs()
+
+    logger.info("syncing the repository...")
+    repo = Repository(d['repo'])
+    repo.sync(d['src'])
+
+    logger.info("building...")
+
+    with d['src'].chdir():
+            system(d['build_command'], **d)
+    logger.info("done")
+
 
 def main():
-    options, args = parse_options()
-    build(options.engine, args[0], args[1], repo=options.repo, tmpdir=options.tmpdir)
+    args = parse_args()
+    build(args)
 
 if __name__ == "__main__":
     main()

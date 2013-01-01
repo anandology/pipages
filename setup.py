@@ -1,6 +1,12 @@
 
 from setuptools import setup
 
+install_requires = ["PyYAML"]
+
+# argparse is not available as stdlib module for Python<2.7
+if sys.version_info < (2, 7):
+    install_requires.append("argparse")
+
 setup(
     name="pipages",
     version="0.1.dev",
@@ -16,6 +22,6 @@ setup(
             "pipages=pipages.pipages:main"
         ]
     },
-    install_requires=['PyYAML']
+    install_requires=install_requires
 )
 

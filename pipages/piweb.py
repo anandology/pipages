@@ -23,6 +23,8 @@ def get_website(name):
 class build:
     def POST(self):
         i = web.input(name="", _method="GET")
+        web.data()
+
         name = i.name
         d = get_website(name)
         if not d:
