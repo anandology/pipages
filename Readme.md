@@ -14,7 +14,7 @@ How to use
 
 To build a website:
 
-    $ pipages -e jekyll src-dir dest-dir
+    $ pipages python.org.in --repo git://github.com/pythonindia/python.org.in.git --engine mynt --root /var/www/pipages
 
 GitHub Hooks
 ============
