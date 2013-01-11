@@ -37,7 +37,8 @@ def load_config(path):
 	logger.info("loading config from %s", path)
 	return yaml.safe_load(open(path))
 
-AUTOLOAD_PATHS = ["pipages.yml", "/etc/pipages.yml"]
+#AUTOLOAD_PATHS = ["pipages.yml", "/etc/pipages.yml"]
+AUTOLOAD_PATHS = []
 
 def autoload_config():
     for p in AUTOLOAD_PATHS:
