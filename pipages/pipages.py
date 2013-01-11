@@ -9,6 +9,7 @@ from . import _config
 from .path import File
 
 __VERSION__ = "0.1"
+__AUTHOR__ = "Anand Chitipothu <anandology@gmail.com>"
 
 class Repository:
     """Interface to work with repository.
@@ -70,24 +71,13 @@ def parse_args(args=None):
     p.add_argument("-c", "--config", help="path to pipages config file")
     p.add_argument("-e", "--engine", help="Website generation engine to use")
     p.add_argument("--repo", help="Repository URL to fetch the sources")
-    p.add_argument("--root", help="Root directory to keep sources and builds. (default: current directory)", default=None)
+    p.add_argument("--srcdir", help="path to the directory inside the repostory containing sources")
+    p.add_argument("--root", help="Root directory to keep sources and builds. (default: current directory)")
+
     p.add_argument("--build-root", help="Directory to keep the builds. (default: $root/build)")
     p.add_argument("--src-root", help="Directory to keep the sources. (default: $root/src)")
     return p.parse_args(args)
 
-def update_config(config, args):
-    if args.root:
-        config['root'] = args.root
-
-    if args.build_root:
-        config['build_root'] = args.build_root
-    if 'build_root' not in config:
-        config['build_root'] = os.path.join(config['root'], 'build')
-
-    if args.src_root:
-        config['src_root'] = args.src_root
-    if 'src_root' not in config:
-        config['src_root'] = os.path.join(config['root'], 'src')
 
 def get_project_vars(config, args):
     """Combines config and args and return the vars relevant for the project
@@ -96,7 +86,7 @@ def get_project_vars(config, args):
     root = config.get("root", "")
     if args.root:
         root = args.root
-    root = File(root).abspath()
+    root = File(root).abspath().normpath()
 
     build_root = File(args.build_root or 
                       config.get("build_root") or
@@ -109,9 +99,12 @@ def get_project_vars(config, args):
     d = config.get("projects", {}).get(name, {})
     d.setdefault("name", name)
 
+    d['srcdir'] = args.srcdir or config.get("srcdir") or ""
+
     # using d['name'] because config can specify a different name
-    d['src'] = src_root.join(d['name'])
-    d['dest'] = build_root.join(d['name'])
+    d['src'] = src_root.join(d['name']).normpath()
+
+    d['dest'] = build_root.join(d['name']).normpath()
 
     if args.repo: # or use the default from config
         d['repo'] = args.repo
@@ -148,8 +141,12 @@ def build(args):
 
     logger.info("building...")
 
+    # ugly to change src like this.
+    # TODO: need to find different names for repo-dir and src-dir.
+    d['src'] = d['src'].join(d['srcdir']).normpath()
+
     with d['src'].chdir():
-            system(d['build_command'], **d)
+        system(d['build_command'], **d)
     logger.info("done")
 
 

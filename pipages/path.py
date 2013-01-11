@@ -8,6 +8,9 @@ class File:
 	def abspath(self):
 		return File(os.path.abspath(self.path))
 
+	def normpath(self):
+		return File(os.path.normpath(self.path))
+
 	def join(self, *args):
 		return File(os.path.join(self.path, *args))
 
