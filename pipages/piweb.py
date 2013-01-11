@@ -8,7 +8,7 @@ import os
 import yaml
 import web
 
-from . import pipages
+from . import pipages, _config
 
 urls = (
     "/?.*", "build"
@@ -16,9 +16,10 @@ urls = (
 app = web.application(urls, globals())
 
 config = None
+configpath = None
 
-def get_website(name):
-    return config.get("websites", {}).get(name)
+def get_project(name):
+    return config.get("projects", {}).get(name)
 
 class build:
     def POST(self):
@@ -26,42 +27,22 @@ class build:
         web.data()
 
         name = i.name
-        d = get_website(name)
+        d = get_project(name)
         if not d:
             raise web.notfound()
 
-        kwargs = {
-            "engine": d['engine'],
-            "src": d['repo'],
-            "dest": self.get_dest_path(name),
-            "repo": "git",
-            "tmpdir": self.get_tmpdir()
-        }
-        pipages.build(**kwargs)
+        args = pipages.parse_args([name, "-c", configpath])
+        pipages.build(args)
         web.header("content-type", "text/plain")
-        return "ok"
-
-    def get_dest_path(self, name):
-        root = config['root']
-        dir = os.path.join(root, "public", name)
-        if not os.path.exists(dir):
-            os.makedirs(dir)
-        return dir
-
-    def get_tmpdir(self):
-        root = config['root']
-        dir = os.path.join(root, "tmp")
-        if not os.path.exists(dir):
-            os.makedirs(dir)
-        return dir
+        return "ok\n"
 
 def load_config(configfile):
-    global config
-    config = yaml.safe_load(open(configfile))
+    global config, configpath
+    config = _config.load_config(configfile)
+    configpath = configfile
     print config
 
 def run():
     """Runs the app.
     """
     app.run()
-
