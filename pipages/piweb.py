@@ -60,9 +60,8 @@ def load_config(configfile):
     config = yaml.safe_load(open(configfile))
     print config
 
-def run(configfile):
-    """Runs the app after initializing the configuration.
+def run():
+    """Runs the app.
     """
-    load_config(configfile)
     app.run()
 
