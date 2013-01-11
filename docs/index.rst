@@ -127,14 +127,12 @@ file and triggeres the build.
 Triggering builds via web can potentially be dangerous. It can triggered by
 anyone and prone to `DDOS attack`_.
 
-To prevent misuse, pipages provides the following features.
+To prevent misuse, pipages web interface allows only the projects listed in the
+config file to be built. One easier way to secure your server is by picking a 
+project name that is not easily guessable. Alternatively, you can add a random
+suffix to the project name.
 
-* Only the projects specified in the config file can be built. You can pick
-  a project name that is only known to you.
-* If the optional parameter ``secret`` is specified the project settings, the
-  build is triggered only when the it is specified as query parameter.
-
-But, it is recommended to `setup http authentication`_ in the webserver.  
+However, the best way is to `setup http authentication`_ in the webserver.  
 
 GitHub Hook
 -----------
