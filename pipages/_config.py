@@ -28,6 +28,7 @@ default_config = {
 	    "jekyll": "jekyll --safe $src $dest",
 	    "mynt": "mynt gen -f $src $dest",
 	    "pelican": "pelican -s $src/pelicanconf.py $src/content -o $dest",
+	    "sphinx": "sphinx-build -b html -d $src/_build/doctrees $src $dest"
 	}
 }
 
