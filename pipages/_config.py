@@ -14,8 +14,8 @@ default_config = {
 
 	"repos": {
 		"git": {
-			"clone": "git clone $repo_url $src",
-			"update": "git pull"
+			"clone": "git clone $repo_url $src && cd $src && git submodule init && git submodule update",
+			"update": "git pull && git submodule init && git submodule update"
 		},
 		"hg": {
 			"clone": "git clone $repo_url $src",
